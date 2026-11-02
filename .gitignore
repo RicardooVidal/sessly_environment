@@ -1,3 +1,6 @@
 /.vscode
-/mindease
-/mindease_api
+/sessly
+/sessly_api
+.env.production
+.env.production.*
+!.env.production.example

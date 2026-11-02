@@ -1,16 +1,16 @@
 networks:
-  mindease:
+  sessly:
     driver: bridge
 
 services:
 
   db:
     image: postgres:14
-    container_name: db_mindease
+    container_name: db_sessly
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
-      POSTGRES_DB: mindease
+      POSTGRES_DB: sessly
     tty: true
     restart: unless-stopped
     ports:
@@ -18,29 +18,38 @@ services:
     volumes: 
       - ../media/postgres_data:/var/lib/postgresql/data
     networks:
-      - mindease
+      - sessly
     
+  redis:
+    image: redis:7-alpine
+    container_name: redis_sessly
+    restart: unless-stopped
+    ports:
+      - 6380:6379
+    networks:
+      - sessly
+
   api:
     build:
-      context: ./mindease_api
+      context: ./sessly_api
       dockerfile: Dockerfile.local
-    container_name: api_mindease
+    container_name: api_sessly
     tty: true
     ports:
       - 8882:8882/tcp
     depends_on:
       - db
     volumes:
-      - ./mindease_api/:/var/www/html
-      - ../media/mindease_files:/var/www/html/storage/app/public
+      - ./sessly_api/:/var/www/html
+      - ../media/sessly_files:/var/www/html/storage/app/public
     networks:
-      - mindease
+      - sessly
 
   frontend:
     build:
-      context: ./mindease
+      context: ./sessly
       dockerfile: Dockerfile.local
-    container_name: front_mindease
+    container_name: front_sessly
     tty: true
     environment:
       - NODE_ENV=development
@@ -49,8 +58,8 @@ services:
     depends_on:
       - api
     volumes:
-      - "./mindease/:/app"
+      - "./sessly/:/app"
     env_file:
-      ./mindease/.env
+      ./sessly/.env
     networks:
-      - mindease
+      - sessly

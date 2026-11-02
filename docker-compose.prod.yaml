@@ -1,0 +1,122 @@
+name: sessly
+
+services:
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - internal
+
+  api:
+    image: sessly-api:local
+    build:
+      context: ../api
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - sessly_storage:/var/www/html/storage/app/public
+      - sessly_private:/var/www/html/storage/app/private
+    networks:
+      - internal
+
+  queue-worker:
+    image: sessly-api:local
+    restart: unless-stopped
+    command: php artisan queue:work redis --sleep=3 --tries=3 --timeout=90
+    env_file:
+      - .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - sessly_storage:/var/www/html/storage/app/public
+      - sessly_private:/var/www/html/storage/app/private
+    networks:
+      - internal
+    stop_grace_period: 120s
+
+  scheduler:
+    image: sessly-api:local
+    restart: unless-stopped
+    command: >
+      sh -c 'while true; do
+        php artisan schedule:run;
+        sleep $$((60 - $$(date +%s) % 60));
+      done'
+    env_file:
+      - .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - sessly_storage:/var/www/html/storage/app/public
+      - sessly_private:/var/www/html/storage/app/private
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: /
+    restart: unless-stopped
+    networks:
+        proxy:
+          aliases:
+            - sessly-frontend
+
+  api-nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - ./nginx/api.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../api/public:/var/www/html/public:ro
+      - sessly_storage:/var/www/html/storage/app/public:ro
+    networks:
+      internal:
+      proxy:
+        aliases:
+          - sessly-api
+
+networks:
+  internal:
+    driver: bridge
+
+  proxy:
+    external: true
+
+volumes:
+  postgres_data:
+  sessly_storage:
+  sessly_private:
