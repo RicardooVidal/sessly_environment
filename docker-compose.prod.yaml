@@ -38,7 +38,7 @@ services:
       redis:
         condition: service_started
     volumes:
-      - /opt/docker/apps/sessly/api/:/var/www/html
+      - ../api/:/var/www/html
       - sessly_storage:/var/www/html/storage/app/public
       - sessly_private:/var/www/html/storage/app/private
     networks:
@@ -56,7 +56,7 @@ services:
       redis:
         condition: service_started
     volumes:
-      - /opt/docker/apps/sessly/api/:/var/www/html
+      - ../api/:/var/www/html
       - sessly_storage:/var/www/html/storage/app/public
       - sessly_private:/var/www/html/storage/app/private
     networks:
